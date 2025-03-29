@@ -9,13 +9,27 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Keyboard,
+  KeyboardAvoidingView,
+  Image,
+  Dimensions,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
 import { API_URL } from "../../api/config";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import CheckBox from "@react-native-community/checkbox";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
 
 export default function PublicForm() {
   const { id } = useLocalSearchParams();
@@ -26,6 +40,15 @@ export default function PublicForm() {
   const [resumeFile, setResumeFile] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateField, setDateField] = useState(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [date, setDate] = useState(null);
+
+  let [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+  });
 
   useEffect(() => {
     fetchForm();
@@ -258,6 +281,7 @@ export default function PublicForm() {
                   });
                   setResponses(initialResponses);
                   setResumeFile(null);
+                  setIsSubmitted(true);
                 },
               },
             ]
@@ -449,11 +473,10 @@ export default function PublicForm() {
     }
   };
 
-  if (loading) {
+  if (!fontsLoaded || loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4a6da7" />
-        <Text style={styles.loadingText}>Loading form...</Text>
       </View>
     );
   }
@@ -461,138 +484,287 @@ export default function PublicForm() {
   if (!form) {
     return (
       <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={64} color="#ff6b6b" />
-        <Text style={styles.errorTitle}>Form Not Found</Text>
-        <Text style={styles.errorMessage}>
-          The form you are looking for is not available.
-        </Text>
+        <MaterialIcons name="error-outline" size={64} color="#e53e3e" />
+        <Text style={styles.errorText}>Form not found or has expired</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Job Application Form</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      <ScrollView style={styles.formContainer}>
-        <View style={styles.formHeader}>
-          <Text style={styles.formTitle}>{form.title}</Text>
-          {form.description && (
-            <Text style={styles.formDescription}>{form.description}</Text>
-          )}
-        </View>
+      {/* Form Header */}
+      <LinearGradient colors={["#4a6da7", "#6384b8"]} style={styles.formHeader}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backIconButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
 
-        {form.fields.map((field) => (
-          <View key={field.id} style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>
-              {field.label}
-              {field.required && <Text style={styles.requiredStar}>*</Text>}
-            </Text>
-            {renderField(field)}
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.formTitle}>{form.title}</Text>
+            {form.description && (
+              <Text style={styles.formDescription}>{form.description}</Text>
+            )}
           </View>
-        ))}
+        </View>
+      </LinearGradient>
 
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleSubmit}
-          disabled={submitting}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.contentContainer}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+          {isSubmitted ? (
+            <View style={styles.successContainer}>
+              <View style={styles.successIconContainer}>
+                <Ionicons name="checkmark-circle" size={80} color="#4a6da7" />
+              </View>
+              <Text style={styles.successTitle}>
+                Form Submitted Successfully!
+              </Text>
+              <Text style={styles.successMessage}>
+                Thank you for your submission. Your responses have been
+                recorded.
+              </Text>
+              <TouchableOpacity
+                style={styles.submitAnotherButton}
+                onPress={() => {
+                  // Reset form and responses
+                  setIsSubmitted(false);
+                  initializeResponses();
+                }}
+              >
+                <Text style={styles.submitAnotherButtonText}>
+                  Submit Another Response
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : (
-            <Text style={styles.submitButtonText}>Submit Application</Text>
+            <>
+              {/* Form Fields */}
+              <View style={styles.formCard}>
+                {form.fields.map((field, index) => (
+                  <View key={index} style={styles.fieldContainer}>
+                    <Text style={styles.fieldLabel}>
+                      {field.label}
+                      {field.required && (
+                        <Text style={styles.requiredStar}> *</Text>
+                      )}
+                    </Text>
+
+                    {renderField(field)}
+                  </View>
+                ))}
+
+                {/* Resume Upload Section */}
+                {form.hrRequirements && form.hrRequirements.requireResume && (
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.fieldLabel}>
+                      Resume Upload
+                      {form.hrRequirements.resumeRequired && (
+                        <Text style={styles.requiredStar}> *</Text>
+                      )}
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.resumeUploadButton}
+                      onPress={pickResume}
+                    >
+                      <FontAwesome5 name="file-pdf" size={20} color="#4a6da7" />
+                      <Text style={styles.resumeUploadText}>
+                        {resumeFile
+                          ? resumeFile.name
+                          : "Tap to upload your resume (PDF)"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {resumeFile && (
+                      <TouchableOpacity
+                        style={styles.removeResumeButton}
+                        onPress={() => setResumeFile(null)}
+                      >
+                        <Text style={styles.removeResumeText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Text style={styles.submitButtonText}>Submit Form</Text>
+                      <Ionicons
+                        name="send"
+                        size={18}
+                        color="#ffffff"
+                        style={{ marginLeft: 8 }}
+                      />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </>
           )}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+
+          {/* Show date picker for iOS */}
+          {showDatePicker && Platform.OS === "ios" && (
+            <View style={styles.datePickerIOS}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.datePickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    if (date) {
+                      handleDateChange(date);
+                    }
+                  }}
+                >
+                  <Text style={styles.datePickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={date || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setDate(selectedDate);
+                }}
+              />
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#f5f7fa",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#555",
+    backgroundColor: "#f5f7fa",
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f5f7fa",
     padding: 20,
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
+  errorText: {
+    fontFamily: "Montserrat_600SemiBold",
+    fontSize: 18,
+    color: "#2d3748",
+    textAlign: "center",
     marginTop: 16,
-  },
-  errorMessage: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  header: {
-    backgroundColor: "#4a6da7",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#ffffff",
-    textAlign: "center",
-  },
-  formContainer: {
-    flex: 1,
-    padding: 20,
-  },
-  formHeader: {
     marginBottom: 24,
   },
+  backButton: {
+    backgroundColor: "#4a6da7",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    fontFamily: "Montserrat_600SemiBold",
+    color: "#ffffff",
+    fontSize: 14,
+  },
+  formHeader: {
+    paddingTop: Platform.OS === "android" ? 20 : 0,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backIconButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
   formTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
+    fontFamily: "Montserrat_700Bold",
+    fontSize: 20,
+    color: "#ffffff",
+    marginBottom: 4,
   },
   formDescription: {
-    fontSize: 16,
-    color: "#666",
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.9)",
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+    padding: 16,
+  },
+  formCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
   },
   fieldContainer: {
     marginBottom: 20,
   },
   fieldLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
+    fontFamily: "Montserrat_600SemiBold",
+    fontSize: 14,
+    color: "#2d3748",
     marginBottom: 8,
   },
   requiredStar: {
-    color: "#ff6b6b",
-    marginLeft: 4,
+    color: "#e53e3e",
   },
   textInput: {
-    backgroundColor: "#ffffff",
+    fontFamily: "Montserrat_400Regular",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#e1e5eb",
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
+    color: "#2d3748",
   },
-  textArea: {
+  textareaInput: {
     minHeight: 100,
     textAlignVertical: "top",
   },
@@ -600,48 +772,70 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#e1e5eb",
     borderRadius: 8,
     padding: 12,
   },
-  datePickerButtonText: {
-    fontSize: 16,
-    color: "#555",
+  datePickerText: {
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "#9DA3B4",
+  },
+  datePickerSelectedText: {
+    color: "#2d3748",
+  },
+  datePickerIOS: {
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#e1e5eb",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e1e5eb",
+  },
+  datePickerCancel: {
+    fontFamily: "Montserrat_500Medium",
+    color: "#4a5568",
+    fontSize: 14,
+  },
+  datePickerDone: {
+    fontFamily: "Montserrat_600SemiBold",
+    color: "#4a6da7",
+    fontSize: 14,
   },
   selectContainer: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    overflow: "hidden",
+    marginTop: 4,
   },
-  selectOption: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  selectOptionSelected: {
-    backgroundColor: "#e8f0fe",
-  },
-  selectOptionText: {
-    fontSize: 16,
-    color: "#555",
-  },
-  selectOptionTextSelected: {
-    color: "#4a6da7",
-    fontWeight: "bold",
-  },
-  radioContainer: {
-    marginTop: 8,
-  },
-  radioOption: {
+  optionItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e1e5eb",
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  radioButton: {
+  selectedOption: {
+    backgroundColor: "rgba(74, 109, 167, 0.1)",
+    borderColor: "#4a6da7",
+  },
+  selectedMultiOption: {
+    backgroundColor: "rgba(74, 109, 167, 0.1)",
+    borderColor: "#4a6da7",
+  },
+  radioOuter: {
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -649,84 +843,148 @@ const styles = StyleSheet.create({
     borderColor: "#4a6da7",
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 10,
   },
-  radioButtonSelected: {
+  radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: "#4a6da7",
   },
-  radioOptionText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: "#333",
+  checkboxOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "#4a6da7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+    backgroundColor: (responses) => (responses ? "#4a6da7" : "transparent"),
   },
-  checkboxContainer: {
+  optionText: {
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "#2d3748",
+  },
+  resumeUploadButton: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e1e5eb",
+    borderRadius: 8,
+    padding: 12,
   },
-  checkboxLabel: {
+  resumeUploadText: {
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "#2d3748",
     marginLeft: 10,
+    flex: 1,
+  },
+  removeResumeButton: {
+    padding: 8,
+    alignSelf: "flex-end",
+    marginTop: 8,
+  },
+  removeResumeText: {
+    fontFamily: "Montserrat_500Medium",
+    fontSize: 12,
+    color: "#e53e3e",
+  },
+  submitButton: {
+    backgroundColor: "#4a6da7",
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  submitButtonText: {
+    fontFamily: "Montserrat_600SemiBold",
+    color: "#ffffff",
     fontSize: 16,
-    color: "#333",
+  },
+  successContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  successIconContainer: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontFamily: "Montserrat_700Bold",
+    fontSize: 20,
+    color: "#2d3748",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  successMessage: {
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "#4a5568",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  submitAnotherButton: {
+    backgroundColor: "#4a6da7",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  submitAnotherButtonText: {
+    fontFamily: "Montserrat_600SemiBold",
+    color: "#ffffff",
+    fontSize: 14,
   },
   fileContainer: {
-    marginVertical: 8,
+    marginTop: 20,
   },
   filePickerButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#e1e5eb",
     borderRadius: 8,
-    padding: 14,
+    padding: 12,
   },
   filePickerButtonText: {
-    fontSize: 16,
-    color: "#4a6da7",
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 14,
+    color: "#2d3748",
     marginLeft: 10,
+    flex: 1,
   },
   filePreview: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#e8f0fe",
-    borderRadius: 8,
-    padding: 10,
     marginTop: 8,
   },
   fileInfo: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
   },
   fileDetails: {
-    marginLeft: 8,
-    flex: 1,
-  },
-  fileName: {
-    fontWeight: "bold",
-    color: "#333",
-  },
-  fileSize: {
-    fontSize: 12,
-    color: "#666",
-  },
-  fileRemoveButton: {
     marginLeft: 10,
   },
-  submitButton: {
-    backgroundColor: "#4a6da7",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 16,
-    marginBottom: 40,
+  fileName: {
+    fontFamily: "Montserrat_600SemiBold",
+    fontSize: 14,
+    color: "#2d3748",
   },
-  submitButtonText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "bold",
+  fileSize: {
+    fontFamily: "Montserrat_400Regular",
+    fontSize: 12,
+    color: "#9DA3B4",
+  },
+  fileRemoveButton: {
+    padding: 8,
+    alignSelf: "flex-end",
+    marginTop: 8,
   },
 });

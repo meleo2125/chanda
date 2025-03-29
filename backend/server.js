@@ -17,6 +17,77 @@ require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const GEMINI_API_KEY =
   process.env.GEMINI_API_KEY || "AIzaSyDEz-z1SYaOVqyNZiF-A1HFdJH8Lng7mBs";
 
+// Function to parse job description using Gemini AI
+async function parseJobDescriptionWithGemini(jobDescription) {
+  console.log("Parsing job description with Gemini...");
+  const url =
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=" +
+    GEMINI_API_KEY;
+
+  const prompt = `
+    Parse the following job description and extract structured information in JSON format.
+    Extract these fields (leave empty if not found):
+    - job_id: Job ID or reference number
+    - role: The job title or role
+    - minimum_experience: Minimum years of experience required (number only)
+    - maximum_experience: Maximum years of experience mentioned (number only)
+    - industry: The industry this job is in (e.g., IT, Healthcare)
+    - notice_period: Required notice period
+    - preferred_notice_period: Preferred notice period if mentioned
+    - city: City location
+    - state: State/province
+    - country: Country
+    - remote_option: Remote work options (e.g., Remote, Hybrid, Onsite)
+    - required_skills: Array of required skills/technologies
+    - preferred_skills: Array of preferred/nice-to-have skills
+    - qualifications: Array of educational or certification requirements
+
+    If certain information like industry is not explicitly mentioned but can be inferred from the role description (e.g., Web Developer implies IT industry), make a reasonable inference.
+
+    Job Description:
+    """${jobDescription}"""
+    
+    Return only valid JSON output, without any additional text or explanations.
+  `;
+
+  try {
+    const response = await axios.post(url, {
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    let reply = response.data.candidates[0].content.parts[0].text;
+    reply = reply
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    // Save the raw response for debugging
+    try {
+      // Create directory if it doesn't exist
+      if (!fs.existsSync("./backend/gemini-logs")) {
+        fs.mkdirSync("./backend/gemini-logs", { recursive: true });
+      }
+
+      // Save response with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      fs.writeFileSync(
+        `./backend/gemini-logs/jd_parse_${timestamp}.json`,
+        JSON.stringify({ prompt, response: reply }, null, 2)
+      );
+    } catch (logError) {
+      console.error("Error saving Gemini response log:", logError);
+    }
+
+    return JSON.parse(reply);
+  } catch (error) {
+    console.error(
+      "Error fetching data from Gemini API:",
+      error.response ? error.response.data : error.message
+    );
+    return null;
+  }
+}
+
 // Function to extract text from the PDF buffer
 async function extractTextFromPDF(pdfBuffer) {
   try {
@@ -345,8 +416,11 @@ const cors = require("cors");
 app.use(
   cors({
     origin: "*", // Allow all origins (for testing)
-    methods: ["GET", "POST", "DELETE"], // Added DELETE method
-    allowedHeaders: ["Content-Type", "x-auth-token"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-auth-token", "Authorization"],
+    credentials: true,
+    exposedHeaders: ["Content-Length", "X-Foo", "X-Bar"],
+    maxAge: 86400, // 24 hours
   })
 );
 
@@ -669,15 +743,21 @@ app.post("/api/login", async (req, res) => {
 
 // Middleware for authentication
 const auth = (req, res, next) => {
+  // For OPTIONS requests, skip auth and proceed (needed for CORS preflight)
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
   // Get token from header
   const token = req.header("x-auth-token");
   console.log(
-    "Auth middleware - token received:",
+    `Auth middleware - ${req.method} ${req.originalUrl} - token received:`,
     token ? "Token present" : "No token"
   );
 
   // Check if no token
   if (!token) {
+    console.log("Auth failed: No token provided");
     return res.status(401).json({ message: "No token, authorization denied" });
   }
 
@@ -1324,6 +1404,84 @@ app.get("/api/submissions/:formId", auth, async (req, res) => {
   } catch (error) {
     console.error("Get Submissions Error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Test endpoint for job description parsing (no auth required)
+app.post("/api/test-jd-parse", async (req, res) => {
+  try {
+    console.log("Test JD Parse Request Received");
+
+    res.set({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers":
+        "Content-Type, x-auth-token, Authorization",
+    });
+
+    const { jobDescription } = req.body;
+
+    if (!jobDescription || typeof jobDescription !== "string") {
+      return res.status(400).json({
+        message: "Job description is required and must be a string",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Test endpoint working correctly - request received",
+      requestBody: {
+        jobDescriptionLength: jobDescription.length,
+        firstFewChars: jobDescription.substring(0, 50) + "...",
+      },
+    });
+  } catch (error) {
+    console.error("Test JD Parse Error:", error);
+    res.status(500).json({
+      message: "Server error in test endpoint",
+      error: error.message,
+    });
+  }
+});
+
+// Job Description Parsing API Endpoint
+app.options("/api/parse-job-description", cors()); // Handle preflight for this specific route
+
+app.post("/api/parse-job-description", auth, async (req, res) => {
+  try {
+    console.log("Job Description Parsing Request Received");
+    const { jobDescription } = req.body;
+
+    if (!jobDescription || typeof jobDescription !== "string") {
+      return res.status(400).json({
+        message: "Job description is required and must be a string",
+      });
+    }
+
+    // Parse the job description using Gemini AI
+    const parsedData = await parseJobDescriptionWithGemini(jobDescription);
+
+    if (!parsedData) {
+      return res.status(500).json({
+        message: "Failed to parse job description. AI service unavailable.",
+      });
+    }
+
+    // Log the successful parsing
+    console.log("Job description parsed successfully");
+
+    // Return the parsed data
+    res.json({
+      success: true,
+      message: "Job description parsed successfully",
+      ...parsedData,
+    });
+  } catch (error) {
+    console.error("Job Description Parsing Error:", error);
+    res.status(500).json({
+      message: "Server error during job description parsing",
+      error: error.message,
+    });
   }
 });
 

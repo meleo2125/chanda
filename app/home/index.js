@@ -7,17 +7,40 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
+  StatusBar,
+  Dimensions,
+  SafeAreaView,
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 import { API_URL } from "../../api/config";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
+
+const { width } = Dimensions.get("window");
+const cardWidth = width * 0.92;
 
 export default function Dashboard() {
   const { userToken, userInfo, logout } = useAuth();
   const [forms, setForms] = useState([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  // Load Montserrat fonts
+  let [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+  });
 
   useEffect(() => {
     fetchForms();
@@ -81,75 +104,181 @@ export default function Dashboard() {
     router.push(`/home/form-details?id=${formId}`);
   };
 
-  const renderFormItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.formCard}
-      onPress={() => navigateToFormDetails(item._id)}
-    >
-      <View style={styles.formCardHeader}>
-        <Text style={styles.formTitle}>{item.title}</Text>
-        <Text style={styles.formDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
+  const navigateToProfile = () => {
+    router.push("/profile");
+  };
+
+  const renderFormItem = ({ item }) => {
+    const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    const responseCount = item.responseCount || 0;
+    const statusColor = responseCount > 0 ? "#4CAF50" : "#FFA000";
+    const statusText = responseCount > 0 ? "Active" : "Pending";
+
+    return (
+      <TouchableOpacity
+        style={styles.formCard}
+        onPress={() => navigateToFormDetails(item._id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.formCardHeader}>
+          <View style={styles.formTitleContainer}>
+            <Text style={styles.formTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View
+              style={[styles.statusBadge, { backgroundColor: statusColor }]}
+            >
+              <Text style={styles.statusText}>{statusText}</Text>
+            </View>
+          </View>
+          <Text style={styles.formDate}>{formattedDate}</Text>
+        </View>
+
+        <Text style={styles.formDescription} numberOfLines={2}>
+          {item.description || "No description provided"}
         </Text>
+
+        <View style={styles.divider} />
+
+        <View style={styles.formCardFooter}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color="#4a6da7"
+              />
+              <Text style={styles.statText}>
+                {item.fields?.length || 0} fields
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="people-outline" size={16} color="#4a6da7" />
+              <Text style={styles.statText}>{responseCount} responses</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={() => {
+              // Copy to clipboard or share functionality
+              Alert.alert(
+                "Share Form",
+                `Public link: ${API_URL}${item.publicLink}`,
+                [
+                  { text: "Copy", onPress: () => console.log("Link copied") },
+                  { text: "Cancel", style: "cancel" },
+                ]
+              );
+            }}
+          >
+            <Ionicons name="share-social-outline" size={16} color="#fff" />
+            <Text style={styles.shareButtonText}>Share</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a6da7" />
       </View>
-      <Text style={styles.formDescription} numberOfLines={2}>
-        {item.description || "No description provided"}
-      </Text>
-      <View style={styles.formCardFooter}>
-        <Text style={styles.fieldCount}>{item.fields?.length || 0} fields</Text>
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => {
-            // Copy to clipboard or share functionality
-            alert(`Public link: ${API_URL}${item.publicLink}`);
-          }}
-        >
-          <Ionicons name="share-outline" size={18} color="#fff" />
-          <Text style={styles.shareButtonText}>Share Link</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>HR Recruitment Dashboard</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-          <Ionicons name="log-out-outline" size={24} color="#333" />
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>HR Recruitment</Text>
+          <Text style={styles.headerSubtitle}>Dashboard</Text>
+        </View>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => fetchForms()}
+          >
+            <Ionicons name="refresh-outline" size={24} color="#4a6da7" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={navigateToProfile}
+          >
+            <Ionicons name="person-circle-outline" size={36} color="#4a6da7" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>
-          Welcome, {userInfo?.name || "User"}!
-        </Text>
-        <Text style={styles.welcomeDescription}>
-          Create and manage recruitment forms for candidates
-        </Text>
-      </View>
+      <LinearGradient
+        colors={["#4a6da7", "#6C8AC6"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.welcomeBanner}
+      >
+        <View style={styles.welcomeContent}>
+          <View>
+            <Text style={styles.welcomeText}>
+              Welcome, {userInfo?.name?.split(" ")[0] || "User"}
+            </Text>
+            <Text style={styles.welcomeDescription}>
+              Manage your recruitment forms and candidate applications
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={logout}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#fff" />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       <View style={styles.contentContainer}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Recruitment Forms</Text>
+          <View style={styles.sectionTitleContainer}>
+            <Ionicons name="documents-outline" size={24} color="#2A3453" />
+            <Text style={styles.sectionTitle}>Your Forms</Text>
+          </View>
+
           <TouchableOpacity
             style={styles.createButton}
             onPress={navigateToCreateForm}
+            activeOpacity={0.8}
           >
-            <Ionicons name="add" size={24} color="#fff" />
+            <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.createButtonText}>Create Form</Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#4a6da7"
-            style={styles.loader}
-          />
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator
+              size="large"
+              color="#4a6da7"
+              style={styles.loader}
+            />
+            <Text style={styles.loadingText}>Loading your forms...</Text>
+          </View>
         ) : forms.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="document-outline" size={64} color="#c5c5c5" />
+            <Image
+              source={require("../../assets/empty-state.png")}
+              style={styles.emptyStateImage}
+              resizeMode="contain"
+            />
             <Text style={styles.emptyStateText}>No forms created yet</Text>
             <Text style={styles.emptyStateSubtext}>
               Create your first recruitment form to get started
@@ -157,8 +286,12 @@ export default function Dashboard() {
             <TouchableOpacity
               style={styles.emptyStateButton}
               onPress={navigateToCreateForm}
+              activeOpacity={0.8}
             >
-              <Text style={styles.emptyStateButtonText}>Create Form</Text>
+              <Ionicons name="add-circle-outline" size={20} color="#fff" />
+              <Text style={styles.emptyStateButtonText}>
+                Create Your First Form
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -171,14 +304,20 @@ export default function Dashboard() {
           />
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#F8FAFD",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFD",
   },
   header: {
     flexDirection: "row",
@@ -188,147 +327,254 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#e1e1e1",
+    borderBottomColor: "#E1E8F5",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
-    color: "#333",
+    color: "#2A3453",
+    fontFamily: "Montserrat_700Bold",
   },
-  logoutButton: {
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#6A7290",
+    marginTop: 2,
+    fontFamily: "Montserrat_500Medium",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  iconButton: {
     padding: 8,
+    marginRight: 8,
   },
-  welcomeSection: {
-    backgroundColor: "#4a6da7",
-    padding: 20,
+  profileButton: {
+    marginLeft: 8,
+  },
+  welcomeBanner: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  welcomeContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#ffffff",
+    fontFamily: "Montserrat_700Bold",
   },
   welcomeDescription: {
-    fontSize: 16,
-    color: "#e0e0e0",
-    marginTop: 8,
+    fontSize: 14,
+    color: "#E8EDF8",
+    marginTop: 6,
+    fontFamily: "Montserrat_400Regular",
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  logoutText: {
+    color: "#ffffff",
+    marginLeft: 4,
+    fontFamily: "Montserrat_500Medium",
+    fontSize: 12,
   },
   contentContainer: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    marginTop: 8,
+  },
+  sectionTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "#2A3453",
+    marginLeft: 8,
+    fontFamily: "Montserrat_600SemiBold",
   },
   createButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#4a6da7",
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  createButtonText: {
-    color: "#ffffff",
-    marginLeft: 4,
-    fontWeight: "bold",
-  },
-  formsList: {
-    paddingBottom: 20,
-  },
-  formCard: {
-    backgroundColor: "#ffffff",
     borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
     elevation: 2,
-    shadowColor: "#000",
+    shadowColor: "#4a6da7",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  createButtonText: {
+    color: "#ffffff",
+    marginLeft: 6,
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
+  },
+  formsList: {
+    paddingBottom: 20,
+    alignItems: "center",
+  },
+  formCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    width: cardWidth,
+    shadowColor: "#4a6da7",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   formCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  formTitleContainer: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginRight: 10,
   },
   formTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#333",
+    color: "#2A3453",
     flex: 1,
+    fontFamily: "Montserrat_600SemiBold",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  statusText: {
+    color: "white",
+    fontSize: 12,
+    fontFamily: "Montserrat_500Medium",
   },
   formDate: {
-    fontSize: 14,
-    color: "#888",
+    fontSize: 12,
+    color: "#6A7290",
+    fontFamily: "Montserrat_400Regular",
   },
   formDescription: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 12,
+    color: "#6A7290",
+    marginBottom: 16,
+    fontFamily: "Montserrat_400Regular",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E1E8F5",
+    marginBottom: 16,
   },
   formCardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 8,
   },
-  fieldCount: {
-    fontSize: 14,
-    color: "#666",
+  statsContainer: {
+    flexDirection: "row",
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 20,
+  },
+  statText: {
+    fontSize: 13,
+    color: "#6A7290",
+    marginLeft: 6,
+    fontFamily: "Montserrat_500Medium",
   },
   shareButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#4a6da7",
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   shareButtonText: {
     color: "#ffffff",
     marginLeft: 4,
-    fontSize: 14,
+    fontSize: 12,
+    fontFamily: "Montserrat_500Medium",
   },
-  loader: {
-    marginTop: 40,
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "#6A7290",
+    fontFamily: "Montserrat_400Regular",
   },
   emptyState: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 40,
+    padding: 20,
+  },
+  emptyStateImage: {
+    width: 200,
+    height: 200,
+    marginBottom: 24,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
-    marginTop: 16,
+    color: "#2A3453",
+    marginBottom: 8,
+    fontFamily: "Montserrat_600SemiBold",
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: "#666",
+    color: "#6A7290",
     textAlign: "center",
-    marginTop: 8,
     marginBottom: 24,
+    fontFamily: "Montserrat_400Regular",
   },
   emptyStateButton: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#4a6da7",
     paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: "#4a6da7",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   emptyStateButtonText: {
     color: "#ffffff",
-    fontWeight: "bold",
-    fontSize: 16,
+    marginLeft: 8,
+    fontSize: 14,
+    fontFamily: "Montserrat_600SemiBold",
   },
 });
