@@ -93,14 +93,13 @@ export default function FormDetails() {
     fetchSubmissions();
   }, [sortBy]); // Refetch when sort changes
 
-  // Apply filters and update filtered submissions
   useEffect(() => {
     applyFilters();
   }, [submissions, filters]);
 
-  // Filter submissions based on current filter settings
+  // Apply filters and update filtered submissions
   const applyFilters = () => {
-    if (!submissions.length) {
+    if (!submissions || !submissions.length) {
       setFilteredSubmissions([]);
       return;
     }
@@ -308,6 +307,11 @@ export default function FormDetails() {
 
   const shareFormLink = async () => {
     try {
+      if (!form || !form.publicLink) {
+        Alert.alert("Error", "Form link not available");
+        return;
+      }
+
       const publicLink = `${API_URL}${form.publicLink}`;
 
       // Copy to clipboard
@@ -356,7 +360,7 @@ export default function FormDetails() {
 
   // Helper function to calculate metrics from submissions
   const calculateMetrics = () => {
-    if (!submissions.length) {
+    if (!submissions || !submissions.length) {
       return { avgScore: 0, topScore: 0, qualified: 0 };
     }
 
@@ -382,7 +386,7 @@ export default function FormDetails() {
 
   // Helper function to find field label by ID
   const getFieldLabel = (fieldId) => {
-    if (!form) return "";
+    if (!form || !form.fields) return "Unknown";
     const field = form.fields.find((f) => f.id === fieldId);
     return field ? field.label : "Unknown Field";
   };
@@ -521,20 +525,13 @@ export default function FormDetails() {
     );
   };
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || loading || !form) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4a6da7" />
-        <Text style={styles.loadingText}>Loading fonts...</Text>
-      </View>
-    );
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4a6da7" />
-        <Text style={styles.loadingText}>Loading form details...</Text>
+        <Text style={styles.loadingText}>
+          {!fontsLoaded ? "Loading fonts..." : "Loading form details..."}
+        </Text>
       </View>
     );
   }
@@ -1046,9 +1043,9 @@ export default function FormDetails() {
       <View style={styles.formDetailsContainer}>
         <View style={styles.formHeader}>
           <View>
-            <Text style={styles.formTitle}>{form.title}</Text>
+            <Text style={styles.formTitle}>{form?.title || "Loading..."}</Text>
             <Text style={styles.formDate}>
-              Created on {formatDate(form.createdAt)}
+              Created on {form?.createdAt ? formatDate(form.createdAt) : "..."}
             </Text>
           </View>
 
@@ -1058,7 +1055,7 @@ export default function FormDetails() {
           </TouchableOpacity>
         </View>
 
-        {form.description && (
+        {form?.description && (
           <Text style={styles.formDescription} numberOfLines={2}>
             {form.description}
           </Text>
@@ -1082,18 +1079,18 @@ export default function FormDetails() {
         <View style={styles.formStatsContainer}>
           <View style={styles.formStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{form.fields.length}</Text>
+              <Text style={styles.statNumber}>{form?.fields?.length || 0}</Text>
               <Text style={styles.statLabel}>Fields</Text>
             </View>
 
             <View style={styles.statDivider} />
 
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{submissions.length}</Text>
+              <Text style={styles.statNumber}>{submissions?.length || 0}</Text>
               <Text style={styles.statLabel}>Submissions</Text>
             </View>
 
-            {submissions.length > 0 && (
+            {submissions?.length > 0 && (
               <>
                 <View style={styles.statDivider} />
 
@@ -1411,7 +1408,7 @@ export default function FormDetails() {
                   color="#4a6da7"
                   style={styles.submissionsLoader}
                 />
-              ) : filteredSubmissions.length === 0 ? (
+              ) : !filteredSubmissions || filteredSubmissions.length === 0 ? (
                 <View style={styles.emptySubmissions}>
                   <Ionicons
                     name="document-text-outline"
@@ -1422,11 +1419,11 @@ export default function FormDetails() {
                     No submissions found
                   </Text>
                   <Text style={styles.emptySubmissionsSubtext}>
-                    {submissions.length > 0
+                    {submissions && submissions.length > 0
                       ? "Try adjusting your filters to see more results"
                       : "Share the form link with candidates to receive applications"}
                   </Text>
-                  {submissions.length === 0 && (
+                  {(!submissions || submissions.length === 0) && (
                     <TouchableOpacity
                       style={styles.shareEmptyButton}
                       onPress={shareFormLink}
