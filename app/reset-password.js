@@ -8,11 +8,20 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import CustomAlert from "../components/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
-import { API_URL } from "../api/config";
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
 
 export default function ResetPassword() {
   const params = useLocalSearchParams();
@@ -24,7 +33,17 @@ export default function ResetPassword() {
   const [alertMessage, setAlertMessage] = useState("");
   const [showAlert, setShowAlert] = useState(false);
   const [successRedirect, setSuccessRedirect] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
+
+  // Load Montserrat fonts
+  let [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+  });
 
   // Wait until the token is extracted before deciding to redirect
   useEffect(() => {
@@ -41,17 +60,20 @@ export default function ResetPassword() {
 
   const handleReset = async () => {
     if (!newPassword) {
-      showCustomAlert("Please enter a new password");
+      setAlertMessage("Please enter a new password");
+      setShowAlert(true);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showCustomAlert("Passwords do not match");
+      setAlertMessage("Passwords do not match");
+      setShowAlert(true);
       return;
     }
 
     if (!token) {
-      showCustomAlert("Missing reset token");
+      setAlertMessage("Missing reset token");
+      setShowAlert(true);
       return;
     }
 
@@ -59,11 +81,14 @@ export default function ResetPassword() {
 
     try {
       console.log("Sending token to API:", token);
-      const response = await fetch(`${API_URL}/api/update-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, newPassword }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/update-password",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, newPassword }),
+        }
+      );
 
       const data = await response.json();
       if (!response.ok) {
@@ -72,18 +97,23 @@ export default function ResetPassword() {
 
       // Show success message and set a flag to redirect after alert is closed
       setSuccessRedirect(true);
-      showCustomAlert("Password updated successfully!");
+      setAlertMessage("Password updated successfully!");
+      setShowAlert(true);
     } catch (error) {
       console.error("Reset error:", error);
-      showCustomAlert("Invalid or expired token.");
+      setAlertMessage("Invalid or expired token.");
+      setShowAlert(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const showCustomAlert = (message) => {
-    setAlertMessage(message);
-    setShowAlert(true);
+  const showCustomAlert = () => {
+    if (showAlert) {
+      Alert.alert("Reset Password", alertMessage, [
+        { text: "OK", onPress: handleAlertClose },
+      ]);
+    }
   };
 
   // Handle alert close with potential redirect
@@ -102,10 +132,22 @@ export default function ResetPassword() {
     router.push("/login");
   };
 
+  if (showAlert) {
+    showCustomAlert();
+  }
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a6da7" />
+      </View>
+    );
+  }
+
   // Show loading indicator while checking token
   if (checkingToken) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4a6da7" />
       </View>
     );
@@ -113,81 +155,118 @@ export default function ResetPassword() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomAlert
-        visible={showAlert}
-        message={alertMessage}
-        onClose={handleAlertClose}
-      />
-
-      <TouchableOpacity style={styles.backButton} onPress={handleBackToLogin}>
-        <Ionicons name="arrow-back" size={24} color="#4a6da7" />
-      </TouchableOpacity>
-
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>Enter your new password below</Text>
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#4a6da7" />
-        ) : (
-          <>
-            <View style={styles.inputWrapper}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Enter new password"
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.card}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../assets/recruitment-logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
               />
             </View>
 
-            <View style={styles.inputWrapper}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-              />
-            </View>
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.subtitle}>
+              Create a new secure password for your account
+            </Text>
 
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleReset}
-              disabled={loading}
-            >
-              <View
-                style={[styles.buttonGradient, { backgroundColor: "#6a42bd" }]}
+            <View style={styles.formContainer}>
+              <View style={styles.inputContainer}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color="#4a6da7"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="New Password"
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showPassword}
+                  placeholderTextColor="#9DA3B4"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#777"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color="#4a6da7"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm New Password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholderTextColor="#9DA3B4"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons
+                    name={
+                      showConfirmPassword ? "eye-off-outline" : "eye-outline"
+                    }
+                    size={20}
+                    color="#777"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={handleReset}
+                disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.buttonText}>Update Password</Text>
+                  <>
+                    <Ionicons
+                      name="save-outline"
+                      size={20}
+                      color="#fff"
+                      style={styles.buttonIcon}
+                    />
+                    <Text style={styles.resetButtonText}>Update Password</Text>
+                  </>
                 )}
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.loginLink}
-              onPress={handleBackToLogin}
-            >
-              <Text style={styles.loginLinkText}>Back to Login</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBackToLogin}
+              >
+                <Ionicons
+                  name="arrow-back-outline"
+                  size={20}
+                  color="#4a6da7"
+                  style={styles.buttonIcon}
+                />
+                <Text style={styles.backButtonText}>Back to Login</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -195,75 +274,114 @@ export default function ResetPassword() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f7f9fc",
   },
-  backButton: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    zIndex: 10,
-    padding: 10,
-  },
-  formContainer: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 40,
+    shadowColor: "#4a6da7",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    width: "100%",
+    maxWidth: 450,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+  },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#4a6da7",
+    color: "#2A3453",
     marginBottom: 10,
-    fontFamily: "Montserrat_Bold",
+    textAlign: "center",
+    fontFamily: "Montserrat_700Bold",
   },
   subtitle: {
     fontSize: 16,
-    color: "#555",
-    textAlign: "center",
+    color: "#6A7290",
     marginBottom: 30,
-    fontFamily: "Montserrat_Regular",
+    textAlign: "center",
+    fontFamily: "Montserrat_400Regular",
   },
-  inputWrapper: {
+  formContainer: {
+    width: "100%",
+  },
+  inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ddd",
-    width: "100%",
+    borderColor: "#E1E8F5",
+    borderRadius: 12,
     marginBottom: 20,
+    backgroundColor: "#F8FAFD",
+    overflow: "hidden",
   },
   inputIcon: {
-    padding: 10,
+    padding: 15,
   },
   input: {
     flex: 1,
-    padding: 15,
-    fontFamily: "Montserrat_Regular",
+    paddingVertical: 15,
+    paddingRight: 15,
+    fontSize: 16,
+    color: "#2A3453",
+    fontFamily: "Montserrat_400Regular",
   },
-  button: {
-    width: "100%",
+  eyeIconContainer: {
+    padding: 15,
+  },
+  resetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4a6da7",
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
-  buttonGradient: {
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
+  buttonIcon: {
+    marginRight: 10,
   },
-  buttonText: {
-    color: "white",
+  resetButtonText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: "Montserrat_Bold",
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
   },
-  loginLink: {
-    marginTop: 20,
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E1E8F5",
+    borderRadius: 12,
+    paddingVertical: 15,
+    backgroundColor: "#fff",
   },
-  loginLinkText: {
+  backButtonText: {
     color: "#4a6da7",
     fontSize: 16,
-    fontFamily: "Montserrat_Regular",
-    textDecorationLine: "underline",
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
   },
 });

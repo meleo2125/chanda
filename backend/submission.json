@@ -1,0 +1,51 @@
+{
+  "_id": "67e78479c36a44998d04e973",
+  "formId": "67e704985b29a4711c579943",
+  "responses": [
+    {
+      "fieldId": "1",
+      "value": "Mukeshkumar Prajapat",
+      "_id": "67e78479c36a44998d04e974"
+    },
+    {
+      "fieldId": "2",
+      "value": "mukeshprajapat3093@gmail.com",
+      "_id": "67e78479c36a44998d04e975"
+    },
+    {
+      "fieldId": "3",
+      "value": "9372694386",
+      "_id": "67e78479c36a44998d04e976"
+    },
+    {
+      "fieldId": "4",
+      "value": "",
+      "_id": "67e78479c36a44998d04e977"
+    },
+    {
+      "fieldId": "5",
+      "value": "0",
+      "_id": "67e78479c36a44998d04e978"
+    }
+  ],
+  "resumeUrl": "https://iprbucket.s3.amazonaws.com/resumes/1743225976447-MukeshkumarPrajapat-tech.pdf",
+  "aiEvaluation": {
+    "breakdown": {
+      "skills_score": 60,
+      "experience_score": 20,
+      "education_score": 80,
+      "notice_period_score": 100,
+      "overall_profile_score": 70
+    },
+    "final_score": 66,
+    "detailed_reasoning": {
+      "skills_analysis": "The candidate possesses JavaScript and MongoDB, two of the five required skills.  While they have experience with related technologies like Next.js (similar to React) and have frontend experience (HTML, CSS, Figma), they lack experience with the backend technologies Express.js and Node.js. This significantly impacts their skills match.  Possessing additional skills like Python, Java, and SQL is beneficial but not directly relevant to the required skill set.",
+      "experience_analysis": "The candidate has 0 years of experience in web development, which fits within the 0-2 years requirement. However, their roles as Technical Writer and Gaming Manager are not directly relevant to web development.  Lack of professional web development experience lowers this score.",
+      "education_analysis": "The candidate's B.E. in Computer Science Engineering and Data Science directly aligns with the required qualifications. The high CGPA further strengthens their educational qualifications. Additional certifications related to AIML, Java, Python, and Data Science, while not directly relevant to the core MERN stack, demonstrate a keen interest in technology and learning, which is positive. The \"Web Developer Bootcamp\" certification also adds some relevance.",
+      "notice_period_analysis": "As a fresh graduate with no current employment listed, the candidate is likely immediately available, exceeding the 30-day requirement and aligning with the preferred 15-day or less notice period.",
+      "overall_analysis": "The candidate's projects, especially the \"Virtual Herbal Garden\" using Next.js and Three.js, demonstrates practical application of web development skills. The portfolio website, albeit basic, also adds to this.  While the projects aren't explicitly MERN stack, they showcase relevant frontend development skills and the ability to learn and apply new technologies.  The lack of professional web development experience is a drawback, but the educational background, relevant projects, and quick availability make them a potential candidate for junior-level positions or internships."
+    }
+  },
+  "submittedAt": "2025-03-29T05:26:17.759Z",
+  "__v": 0
+}

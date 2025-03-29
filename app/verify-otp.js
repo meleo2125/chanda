@@ -1,173 +1,272 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Image,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
-import { useAuth } from "../context/AuthContext";
-import CustomAlert from "../components/CustomAlert";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
 
 export default function VerifyOTP() {
-  const [otp, setOtp] = useState("");
-  const [timeLeft, setTimeLeft] = useState(900); // 15 minutes in seconds
-  const [alertMessage, setAlertMessage] = useState("");
+  const { email } = useLocalSearchParams();
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(120);
+  const [timerActive, setTimerActive] = useState(true);
   const [showAlert, setShowAlert] = useState(false);
-  const params = useLocalSearchParams();
+  const [alertMessage, setAlertMessage] = useState("");
   const router = useRouter();
-  const { verifyOTP, requestOTP, isLoading } = useAuth();
+  const inputRefs = useRef([]);
 
-  // Get email and userData from params
-  const email = params.email;
-  const userData = params.userData ? JSON.parse(params.userData) : null;
+  // Load Montserrat fonts
+  let [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+  });
 
-  // Set screen orientation to landscape
   useEffect(() => {
-    async function setOrientation() {
+    const setOrientation = async () => {
       await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.LANDSCAPE
+        ScreenOrientation.OrientationLock.PORTRAIT_UP
       );
-    }
+    };
     setOrientation();
-
-    // Return if no email
-    if (!email) {
-      router.replace("/register");
-      return;
-    }
-
-    // Timer countdown
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
+    return () => {
+      ScreenOrientation.unlockAsync();
+    };
   }, []);
 
-  // Format time as MM:SS
+  useEffect(() => {
+    let timer;
+    if (timerActive && timeRemaining > 0) {
+      timer = setTimeout(() => {
+        setTimeRemaining(timeRemaining - 1);
+      }, 1000);
+    } else if (timeRemaining === 0) {
+      setTimerActive(false);
+    }
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [timerActive, timeRemaining]);
+
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
+    const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  const handleInputChange = (text, index) => {
+    const newOtp = [...otp];
+    // Allow only numeric input
+    const formattedText = text.replace(/[^0-9]/g, "");
+    newOtp[index] = formattedText;
+
+    setOtp(newOtp);
+
+    // Auto-focus to next input
+    if (formattedText && index < 5) {
+      inputRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleKeyPress = (e, index) => {
+    // Handle backspace to move to previous input
+    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
+      inputRefs.current[index - 1].focus();
+    }
   };
 
   const handleVerifyOTP = async () => {
-    if (!otp || otp.length !== 6) {
-      showCustomAlert("Please enter a valid 6-digit OTP");
+    const otpValue = otp.join("");
+    if (otpValue.length !== 6) {
+      setAlertMessage("Please enter all 6 digits of the OTP");
+      setShowAlert(true);
       return;
     }
 
-    const result = await verifyOTP(email, otp, userData);
+    setIsLoading(true);
 
-    if (result.success) {
-      showCustomAlert("Email verified successfully!");
-      setTimeout(() => {
-        router.replace("/login");
-      }, 2000);
-    } else {
-      showCustomAlert(result.message || "Invalid OTP");
+    try {
+      const response = await fetch("http://localhost:5000/api/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, otp: otpValue }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setAlertMessage("OTP verified successfully!");
+        setShowAlert(true);
+        setTimeout(() => {
+          router.replace("/login");
+        }, 1000);
+      } else {
+        setAlertMessage(data.message || "Invalid OTP. Please try again.");
+        setShowAlert(true);
+      }
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      setAlertMessage("Something went wrong. Please try again.");
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleResendOTP = async () => {
-    const result = await requestOTP(email);
+    setIsLoading(true);
 
-    if (result.success) {
-      // Reset timer
-      setTimeLeft(900); // 15 minutes
-      showCustomAlert("OTP sent successfully");
-    } else {
-      showCustomAlert(result.message || "Failed to send OTP");
+    try {
+      const response = await fetch("http://localhost:5000/api/resend-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTimeRemaining(120);
+        setTimerActive(true);
+        setAlertMessage("A new OTP has been sent to your email");
+        setShowAlert(true);
+      } else {
+        setAlertMessage(
+          data.message || "Failed to resend OTP. Please try again."
+        );
+        setShowAlert(true);
+      }
+    } catch (error) {
+      console.error("Error resending OTP:", error);
+      setAlertMessage("Something went wrong. Please try again.");
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const showCustomAlert = (message) => {
-    setAlertMessage(message);
-    setShowAlert(true);
+  const showCustomAlert = () => {
+    if (showAlert) {
+      Alert.alert("OTP Verification", alertMessage, [
+        { text: "OK", onPress: () => setShowAlert(false) },
+      ]);
+    }
   };
+
+  if (showAlert) {
+    showCustomAlert();
+  }
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a6da7" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomAlert
-        visible={showAlert}
-        message={alertMessage}
-        onClose={() => setShowAlert(false)}
-      />
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Email Verification</Text>
-          <Text style={styles.subtitle}>
-            We sent a verification code to your email
-          </Text>
-          <Text style={styles.email}>{email}</Text>
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.card}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../assets/recruitment-logo.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
 
-        <View style={styles.otpContainer}>
-          <Text style={styles.label}>Enter OTP</Text>
-          <TextInput
-            style={styles.otpInput}
-            value={otp}
-            onChangeText={(text) => {
-              // Only allow numbers and max 6 digits
-              if (/^\d*$/.test(text) && text.length <= 6) {
-                setOtp(text);
-              }
-            }}
-            placeholder="6-digit code"
-            keyboardType="number-pad"
-            maxLength={6}
-          />
-          <Text style={styles.timer}>
-            Code expires in: {formatTime(timeLeft)}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleVerifyOTP}
-          disabled={isLoading || timeLeft === 0}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Verify OTP</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.resendContainer}>
-          <Text style={styles.resendText}>Didn't receive the code? </Text>
-          <TouchableOpacity
-            onPress={handleResendOTP}
-            disabled={isLoading || timeLeft > 800} // Allow resend after ~1.5 minutes
-          >
-            <Text
-              style={[
-                styles.resendLink,
-                (isLoading || timeLeft > 800) && styles.disabledText,
-              ]}
-            >
-              Resend OTP
+            <Text style={styles.title}>Verify Your Email</Text>
+            <Text style={styles.subtitle}>
+              Enter the 6-digit code sent to {email}
             </Text>
-          </TouchableOpacity>
-        </View>
 
-        <TouchableOpacity style={styles.backLink} onPress={() => router.back()}>
-          <Text style={styles.backLinkText}>Back to Register</Text>
-        </TouchableOpacity>
-      </View>
+            <View style={styles.otpContainer}>
+              {otp.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={(ref) => (inputRefs.current[index] = ref)}
+                  style={styles.otpInput}
+                  value={digit}
+                  onChangeText={(text) => handleInputChange(text, index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  keyboardType="numeric"
+                  maxLength={1}
+                  placeholder="•"
+                  placeholderTextColor="#9DA3B4"
+                />
+              ))}
+            </View>
+
+            <View style={styles.timerContainer}>
+              <Text style={styles.timerText}>
+                Time remaining: {formatTime(timeRemaining)}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.verifyButton}
+              onPress={handleVerifyOTP}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="checkmark-outline"
+                    size={20}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.verifyButtonText}>Verify OTP</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.resendButton,
+                { opacity: !timerActive || timeRemaining === 0 ? 1 : 0.5 },
+              ]}
+              onPress={handleResendOTP}
+              disabled={timerActive && timeRemaining > 0}
+            >
+              <Text style={styles.resendButtonText}>Resend OTP</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -175,115 +274,107 @@ export default function VerifyOTP() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f7f9fc",
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   card: {
-    width: "60%",
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 40,
+    shadowColor: "#4a6da7",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  header: {
+    shadowRadius: 12,
+    elevation: 8,
+    width: "100%",
+    maxWidth: 450,
     alignItems: "center",
-    marginBottom: 32,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 80,
+    height: 80,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 12,
-    fontFamily: "Montserrat_Bold",
+    color: "#2A3453",
+    marginBottom: 10,
+    textAlign: "center",
+    fontFamily: "Montserrat_700Bold",
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
-    marginBottom: 8,
+    color: "#6A7290",
+    marginBottom: 30,
     textAlign: "center",
-    fontFamily: "Montserrat_Regular",
-  },
-  email: {
-    fontSize: 16,
-    color: "#4a6da7",
-    fontWeight: "bold",
-    fontFamily: "Montserrat_Bold",
+    fontFamily: "Montserrat_400Regular",
   },
   otpContainer: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: "#555",
-    fontFamily: "Montserrat_Regular",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 30,
   },
   otpInput: {
-    backgroundColor: "#f9f9f9",
-    padding: 14,
-    borderRadius: 8,
+    width: 50,
+    height: 60,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    fontSize: 18,
-    fontFamily: "Montserrat_Regular",
+    borderColor: "#E1E8F5",
+    borderRadius: 12,
+    fontSize: 24,
     textAlign: "center",
-    letterSpacing: 8,
-    marginBottom: 16,
+    backgroundColor: "#F8FAFD",
+    color: "#2A3453",
+    fontFamily: "Montserrat_600SemiBold",
   },
-  timer: {
-    fontSize: 14,
-    color: "#888",
-    textAlign: "center",
-    fontFamily: "Montserrat_Regular",
+  timerContainer: {
+    marginBottom: 30,
   },
-  button: {
-    backgroundColor: "#4a6da7",
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    shadowColor: "#4a6da7",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  buttonText: {
-    color: "white",
+  timerText: {
     fontSize: 16,
-    fontWeight: "bold",
-    fontFamily: "Montserrat_Bold",
+    color: "#6A7290",
+    fontFamily: "Montserrat_500Medium",
   },
-  resendContainer: {
+  verifyButton: {
     flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 24,
-  },
-  resendText: {
-    color: "#555",
-    fontSize: 14,
-    fontFamily: "Montserrat_Regular",
-  },
-  resendLink: {
-    color: "#4a6da7",
-    fontSize: 14,
-    fontWeight: "bold",
-    fontFamily: "Montserrat_Bold",
-  },
-  disabledText: {
-    color: "#aaa",
-  },
-  backLink: {
-    marginTop: 24,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4a6da7",
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    width: "100%",
   },
-  backLinkText: {
-    color: "#666",
-    fontSize: 14,
-    fontFamily: "Montserrat_Regular",
+  buttonIcon: {
+    marginRight: 10,
+  },
+  verifyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
+  },
+  resendButton: {
+    padding: 10,
+  },
+  resendButtonText: {
+    color: "#4a6da7",
+    fontSize: 16,
+    fontFamily: "Montserrat_500Medium",
   },
 });

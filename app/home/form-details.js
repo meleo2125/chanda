@@ -169,25 +169,52 @@ export default function FormDetails() {
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Skills</Text>
                 <Text style={styles.scoreValue}>
-                  {item.aiEvaluation.breakdown.skills_score}
+                  {item.aiEvaluation.breakdown?.skills_score || 0}
                 </Text>
               </View>
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Exp</Text>
                 <Text style={styles.scoreValue}>
-                  {item.aiEvaluation.breakdown.experience_score}
+                  {item.aiEvaluation.breakdown?.experience_score || 0}
                 </Text>
               </View>
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Edu</Text>
                 <Text style={styles.scoreValue}>
-                  {item.aiEvaluation.breakdown.education_score}
+                  {item.aiEvaluation.breakdown?.education_score || 0}
                 </Text>
               </View>
               <View style={styles.scoreItem}>
                 <Text style={styles.scoreLabel}>Notice</Text>
                 <Text style={styles.scoreValue}>
-                  {item.aiEvaluation.breakdown.notice_period_score}
+                  {item.aiEvaluation.breakdown?.notice_period_score || 0}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.scoreBreakdown, { marginTop: 8 }]}>
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Achieve</Text>
+                <Text style={styles.scoreValue}>
+                  {item.aiEvaluation.breakdown?.achievements_score || 0}
+                </Text>
+              </View>
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Certs</Text>
+                <Text style={styles.scoreValue}>
+                  {item.aiEvaluation.breakdown?.certificates_score || 0}
+                </Text>
+              </View>
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Culture</Text>
+                <Text style={styles.scoreValue}>
+                  {item.aiEvaluation.breakdown?.cultural_fit_score || 0}
+                </Text>
+              </View>
+              <View style={styles.scoreItem}>
+                <Text style={styles.scoreLabel}>Overall</Text>
+                <Text style={styles.scoreValue}>
+                  {item.aiEvaluation.breakdown?.overall_profile_score || 0}
                 </Text>
               </View>
             </View>
@@ -262,34 +289,57 @@ export default function FormDetails() {
                 <View style={styles.analysisItem}>
                   <Text style={styles.analysisLabel}>Skills:</Text>
                   <Text style={styles.analysisText}>
-                    {item.aiEvaluation.detailed_reasoning.skills_analysis}
+                    {item.aiEvaluation.detailed_reasoning?.skills_analysis ||
+                      "No analysis available."}
                   </Text>
                 </View>
                 <View style={styles.analysisItem}>
                   <Text style={styles.analysisLabel}>Experience:</Text>
                   <Text style={styles.analysisText}>
-                    {item.aiEvaluation.detailed_reasoning.experience_analysis}
+                    {item.aiEvaluation.detailed_reasoning
+                      ?.experience_analysis || "No analysis available."}
                   </Text>
                 </View>
                 <View style={styles.analysisItem}>
                   <Text style={styles.analysisLabel}>Education:</Text>
                   <Text style={styles.analysisText}>
-                    {item.aiEvaluation.detailed_reasoning.education_analysis}
+                    {item.aiEvaluation.detailed_reasoning?.education_analysis ||
+                      "No analysis available."}
                   </Text>
                 </View>
                 <View style={styles.analysisItem}>
                   <Text style={styles.analysisLabel}>Notice Period:</Text>
                   <Text style={styles.analysisText}>
-                    {
-                      item.aiEvaluation.detailed_reasoning
-                        .notice_period_analysis
-                    }
+                    {item.aiEvaluation.detailed_reasoning
+                      ?.notice_period_analysis || "No analysis available."}
+                  </Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Achievements:</Text>
+                  <Text style={styles.analysisText}>
+                    {item.aiEvaluation.detailed_reasoning
+                      ?.achievements_analysis || "No analysis available."}
+                  </Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Certifications:</Text>
+                  <Text style={styles.analysisText}>
+                    {item.aiEvaluation.detailed_reasoning
+                      ?.certificates_analysis || "No analysis available."}
+                  </Text>
+                </View>
+                <View style={styles.analysisItem}>
+                  <Text style={styles.analysisLabel}>Cultural Fit:</Text>
+                  <Text style={styles.analysisText}>
+                    {item.aiEvaluation.detailed_reasoning
+                      ?.cultural_fit_analysis || "No analysis available."}
                   </Text>
                 </View>
                 <View style={styles.analysisItem}>
                   <Text style={styles.analysisLabel}>Overall:</Text>
                   <Text style={styles.analysisText}>
-                    {item.aiEvaluation.detailed_reasoning.overall_analysis}
+                    {item.aiEvaluation.detailed_reasoning?.overall_analysis ||
+                      "No analysis available."}
                   </Text>
                 </View>
               </View>
@@ -426,6 +476,57 @@ export default function FormDetails() {
                   ]}
                 >
                   Education
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  sortBy === "achievements_score" && styles.activeSortButton,
+                ]}
+                onPress={() => setSortBy("achievements_score")}
+              >
+                <Text
+                  style={[
+                    styles.sortButtonText,
+                    sortBy === "achievements_score" &&
+                      styles.activeSortButtonText,
+                  ]}
+                >
+                  Achievements
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  sortBy === "certificates_score" && styles.activeSortButton,
+                ]}
+                onPress={() => setSortBy("certificates_score")}
+              >
+                <Text
+                  style={[
+                    styles.sortButtonText,
+                    sortBy === "certificates_score" &&
+                      styles.activeSortButtonText,
+                  ]}
+                >
+                  Certificates
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.sortButton,
+                  sortBy === "cultural_fit_score" && styles.activeSortButton,
+                ]}
+                onPress={() => setSortBy("cultural_fit_score")}
+              >
+                <Text
+                  style={[
+                    styles.sortButtonText,
+                    sortBy === "cultural_fit_score" &&
+                      styles.activeSortButtonText,
+                  ]}
+                >
+                  Cultural Fit
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity

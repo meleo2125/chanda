@@ -5,19 +5,28 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  TouchableWithoutFeedback,
-  ScrollView,
-  Image,
+  Alert,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   ActivityIndicator,
-  Alert,
+  Image,
+  Dimensions,
+  SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
-import { useAuth } from "../context/AuthContext";
-import CustomAlert from "../components/CustomAlert";
 import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
+import {
+  useFonts,
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+} from "@expo-google-fonts/montserrat";
+
+const { width, height } = Dimensions.get("window");
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -25,338 +34,461 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [age, setAge] = useState("");
-  const [gender, setGender] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [alertMessage, setAlertMessage] = useState("");
-  const [showAlert, setShowAlert] = useState(false);
-  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
-  const [passwordError, setPasswordError] = useState("");
-  const [emailError, setEmailError] = useState("");
+  const [gender, setGender] = useState("male");
   const [company, setCompany] = useState("");
   const [position, setPosition] = useState("");
   const [department, setDepartment] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const router = useRouter();
-  const { register } = useAuth();
 
-  // Set screen orientation to landscape
+  // Load Montserrat fonts
+  let [fontsLoaded] = useFonts({
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+  });
+
   useEffect(() => {
-    async function setOrientation() {
+    const setOrientation = async () => {
       await ScreenOrientation.lockAsync(
         ScreenOrientation.OrientationLock.LANDSCAPE
       );
-    }
+    };
     setOrientation();
+    return () => {
+      ScreenOrientation.unlockAsync();
+    };
   }, []);
 
-  // Clear validation errors when user types
   useEffect(() => {
-    if (password) setPasswordError("");
+    if (password.length > 0) {
+      setPasswordError("");
+    }
   }, [password]);
 
   useEffect(() => {
-    if (email) setEmailError("");
+    if (email.length > 0) {
+      setEmailError("");
+    }
   }, [email]);
 
-  // Add handler to close dropdown when clicking outside
   const handleOutsidePress = () => {
-    if (showGenderDropdown) {
-      setShowGenderDropdown(false);
-    }
-    // Keyboard dismiss removed
+    // Function to dismiss keyboard when user taps outside the input
   };
 
-  // Email validation function
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(String(email).toLowerCase());
   };
 
   const validatePassword = (password) => {
-    let errors = [];
-
-    if (password.length < 8) {
-      errors.push("Password must be at least 8 characters long");
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push("Password must contain at least one uppercase letter");
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push("Password must contain at least one lowercase letter");
-    }
-    if (!/[!@#$%^&*]/.test(password)) {
-      errors.push(
-        "Password must contain at least one special character (!@#$%^&*)"
-      );
-    }
-
-    return errors.length > 0 ? errors.join("\n") : "";
+    // At least 8 characters, one uppercase, one lowercase, one number, one special character
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    return passwordRegex.test(password);
   };
 
   const handleRegister = async () => {
-    // Reset previous errors
-    setPasswordError("");
-    setEmailError("");
-
-    // Validation
+    // Check if any required field is empty
     if (
-      !name ||
-      !email ||
-      !password ||
-      !confirmPassword ||
-      !company ||
-      !position ||
-      !department
+      !name.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim() ||
+      !age.trim() ||
+      !company.trim() ||
+      !position.trim() ||
+      !department.trim()
     ) {
-      Alert.alert("Error", "Please fill in all fields");
+      setAlertMessage("All fields are required");
+      setShowAlert(true);
       return;
     }
 
-    // Basic email format validation
-    if (!isValidEmail(email)) {
+    // Validate email format
+    if (!validateEmail(email)) {
       setEmailError("Please enter a valid email address");
       return;
+    } else {
+      setEmailError("");
     }
 
-    // Password format validation
-    const passwordValidationError = validatePassword(password);
-    if (passwordValidationError) {
-      setPasswordError(passwordValidationError);
+    // Validate password strength
+    if (!validatePassword(password)) {
+      setPasswordError(
+        "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character"
+      );
       return;
+    } else {
+      setPasswordError("");
     }
 
+    // Check if passwords match
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      setAlertMessage("Passwords do not match");
+      setShowAlert(true);
       return;
     }
 
+    // All validations passed, proceed with registration
     setIsLoading(true);
+
+    // Here you would typically make an API call to register the user
     try {
-      // Send registration data to get OTP
-      const userData = {
-        name,
-        email,
-        password,
-        company,
-        position,
-        department,
-      };
+      const response = await fetch("http://localhost:5000/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          age,
+          gender,
+          company,
+          position,
+          department,
+        }),
+      });
 
-      const result = await register(userData);
-      setIsLoading(false);
+      const data = await response.json();
 
-      if (result.success) {
-        // Navigate to OTP verification screen with email and userData
+      if (response.ok) {
+        // Registration successful
+        console.log("Registration successful");
         router.push({
           pathname: "/verify-otp",
-          params: {
-            email: result.email,
-            userData: result.userData,
-          },
+          params: { email },
         });
       } else {
-        // Handle error messages
-        if (result.message && result.message.includes("Email already exists")) {
-          setEmailError(
-            "This email is already registered. Please use a different email or try logging in."
-          );
-        } else {
-          Alert.alert(
-            "Registration Failed",
-            result.message || "Registration failed. Please try again."
-          );
-        }
+        // Registration failed
+        setAlertMessage(data.message || "Registration failed");
+        setShowAlert(true);
       }
     } catch (error) {
-      setIsLoading(false);
-      Alert.alert(
-        "Error",
-        "An error occurred during registration. Please try again."
-      );
       console.error("Registration error:", error);
+      setAlertMessage("Something went wrong. Please try again.");
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const showCustomAlert = (message) => {
-    setAlertMessage(message);
-    setShowAlert(true);
+  const navigateToLogin = () => {
+    router.push("/login");
   };
 
+  const showCustomAlert = () => {
+    if (showAlert) {
+      Alert.alert("Registration Error", alertMessage, [
+        { text: "OK", onPress: () => setShowAlert(false) },
+      ]);
+    }
+  };
+
+  if (showAlert) {
+    showCustomAlert();
+  }
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4a6da7" />
+      </View>
+    );
+  }
+
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        style={styles.container}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../assets/recruitment-logo.png")}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.appName}>HR Recruitment Portal</Text>
-          </View>
-
-          <View style={styles.formContainer}>
-            <Text style={styles.formTitle}>Create Account</Text>
-            <Text style={styles.formSubtitle}>
-              Register to start managing your recruitment process
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Full Name"
-                value={name}
-                onChangeText={setName}
+          <View style={styles.mainContainer}>
+            {/* Left side: SVG illustration */}
+            <View style={styles.illustrationContainer}>
+              <Image
+                source={require("../assets/login.svg")}
+                style={styles.illustration}
+                resizeMode="contain"
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, emailError ? styles.inputError : null]}
-                placeholder="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              {emailError ? (
-                <Text style={styles.errorText}>{emailError}</Text>
-              ) : null}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="business-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Company Name"
-                value={company}
-                onChangeText={setCompany}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, styles.halfInput]}>
-                <Ionicons
-                  name="briefcase-outline"
-                  size={20}
-                  color="#4a6da7"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Position"
-                  value={position}
-                  onChangeText={setPosition}
+            {/* Right side: Registration form */}
+            <View style={styles.formWrapper}>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require("../assets/recruitment-logo.png")}
+                  style={styles.logo}
+                  resizeMode="contain"
                 />
               </View>
 
-              <View style={[styles.inputContainer, styles.halfInput]}>
-                <Ionicons
-                  name="people-outline"
-                  size={20}
-                  color="#4a6da7"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Department"
-                  value={department}
-                  onChangeText={setDepartment}
-                />
+              <View style={styles.formContainer}>
+                <Text style={styles.formTitle}>Create Account</Text>
+                <Text style={styles.formSubtitle}>
+                  Register to access the HR recruitment portal
+                </Text>
+
+                <ScrollView contentContainerStyle={styles.formScrollContent}>
+                  <View style={styles.formRow}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="person-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Full Name"
+                          value={name}
+                          onChangeText={setName}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="mail-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Email Address"
+                          value={email}
+                          onChangeText={setEmail}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                      {emailError ? (
+                        <Text style={styles.errorText}>{emailError}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Password"
+                          value={password}
+                          onChangeText={setPassword}
+                          secureTextEntry={!showPassword}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeIconContainer}
+                          onPress={() => setShowPassword(!showPassword)}
+                        >
+                          <Ionicons
+                            name={
+                              showPassword ? "eye-off-outline" : "eye-outline"
+                            }
+                            size={20}
+                            color="#777"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {passwordError ? (
+                        <Text style={styles.errorText}>{passwordError}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Confirm Password"
+                          value={confirmPassword}
+                          onChangeText={setConfirmPassword}
+                          secureTextEntry={!showConfirmPassword}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeIconContainer}
+                          onPress={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                        >
+                          <Ionicons
+                            name={
+                              showConfirmPassword
+                                ? "eye-off-outline"
+                                : "eye-outline"
+                            }
+                            size={20}
+                            color="#777"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Age"
+                          value={age}
+                          onChangeText={setAge}
+                          keyboardType="numeric"
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.pickerContainer}>
+                        <Ionicons
+                          name="people-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <Picker
+                          selectedValue={gender}
+                          style={styles.picker}
+                          onValueChange={(itemValue) => setGender(itemValue)}
+                        >
+                          <Picker.Item label="Male" value="male" />
+                          <Picker.Item label="Female" value="female" />
+                          <Picker.Item label="Other" value="other" />
+                        </Picker>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="business-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Company"
+                          value={company}
+                          onChangeText={setCompany}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="briefcase-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Position"
+                          value={position}
+                          onChangeText={setPosition}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <View style={styles.inputWrapper}>
+                      <View style={styles.inputContainer}>
+                        <Ionicons
+                          name="git-branch-outline"
+                          size={20}
+                          color="#4a6da7"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="Department"
+                          value={department}
+                          onChangeText={setDepartment}
+                          placeholderTextColor="#9DA3B4"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.registerButton}
+                    onPress={handleRegister}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name="person-add-outline"
+                          size={20}
+                          color="#fff"
+                          style={styles.buttonIcon}
+                        />
+                        <Text style={styles.registerButtonText}>Register</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.loginPrompt}>
+                    <Text style={styles.loginPromptText}>
+                      Already have an account?
+                    </Text>
+                    <TouchableOpacity onPress={navigateToLogin}>
+                      <Text style={styles.loginLink}>Sign In</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={[styles.input, passwordError ? styles.inputError : null]}
-                placeholder="Password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity
-                style={styles.eyeIconContainer}
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={20}
-                  color="#777"
-                />
-              </TouchableOpacity>
-              {passwordError ? (
-                <Text style={styles.errorText}>{passwordError}</Text>
-              ) : null}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color="#4a6da7"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showPassword}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.registerButton}
-              onPress={handleRegister}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.registerButtonText}>Create Account</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>
-                Already have an account?
-              </Text>
-              <TouchableOpacity onPress={() => router.push("/login")}>
-                <Text style={styles.loginLink}>Sign In</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
@@ -365,88 +497,143 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f7f9fc",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   scrollContent: {
     flexGrow: 1,
+  },
+  mainContainer: {
+    flex: 1,
+    flexDirection: "row",
+    height: height,
+  },
+  illustrationContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#eef2ff",
     padding: 20,
-    paddingTop: 40,
-    paddingBottom: 40,
+  },
+  illustration: {
+    width: "100%",
+    height: "80%",
+  },
+  formWrapper: {
+    flex: 1.5,
+    justifyContent: "center",
+    padding: 30,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
   },
   logo: {
     width: 80,
     height: 80,
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#4a6da7",
   },
   formContainer: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    borderRadius: 16,
+    padding: 30,
+    shadowColor: "#4a6da7",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 8,
+    maxHeight: 600,
+  },
+  formScrollContent: {
+    paddingBottom: 10,
   },
   formTitle: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
+    color: "#2A3453",
+    marginBottom: 10,
+    fontFamily: "Montserrat_700Bold",
   },
   formSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 24,
+    fontSize: 16,
+    color: "#6A7290",
+    marginBottom: 20,
+    fontFamily: "Montserrat_400Regular",
+  },
+  formRow: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  inputWrapper: {
+    flex: 1,
+    marginHorizontal: 5,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    marginBottom: 16,
-    backgroundColor: "#f9f9f9",
+    borderColor: "#E1E8F5",
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: "#F8FAFD",
+    overflow: "hidden",
   },
-  row: {
+  pickerContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  halfInput: {
-    flex: 0.48,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E1E8F5",
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: "#F8FAFD",
+    overflow: "hidden",
   },
   inputIcon: {
-    padding: 10,
+    padding: 15,
   },
   input: {
     flex: 1,
-    paddingVertical: 12,
-    paddingRight: 10,
+    paddingVertical: 15,
+    paddingRight: 15,
     fontSize: 16,
-    color: "#333",
+    color: "#2A3453",
+    fontFamily: "Montserrat_400Regular",
+  },
+  picker: {
+    flex: 1,
+    height: 50,
+    color: "#2A3453",
+    fontFamily: "Montserrat_400Regular",
   },
   eyeIconContainer: {
-    padding: 10,
+    padding: 15,
+  },
+  errorText: {
+    color: "#ff4d4f",
+    fontSize: 12,
+    marginBottom: 5,
+    fontFamily: "Montserrat_400Regular",
   },
   registerButton: {
-    backgroundColor: "#4a6da7",
-    borderRadius: 8,
-    paddingVertical: 14,
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
+    justifyContent: "center",
+    backgroundColor: "#4a6da7",
+    borderRadius: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginTop: 15,
     marginBottom: 20,
+  },
+  buttonIcon: {
+    marginRight: 10,
   },
   registerButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
   },
   loginPrompt: {
     flexDirection: "row",
@@ -454,19 +641,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginPromptText: {
-    color: "#666",
-    fontSize: 14,
+    color: "#6A7290",
+    fontSize: 15,
+    marginRight: 5,
+    fontFamily: "Montserrat_400Regular",
   },
   loginLink: {
     color: "#4a6da7",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginLeft: 6,
+    fontSize: 15,
+    fontWeight: "600",
+    fontFamily: "Montserrat_600SemiBold",
   },
-  errorText: {
-    color: "#ff6b6b",
-    fontSize: 14,
-    marginTop: 4,
-    fontFamily: "Montserrat_Regular",
+  // Responsive styles for mobile
+  "@media (max-width: 768px)": {
+    mainContainer: {
+      flexDirection: "column",
+    },
+    illustrationContainer: {
+      display: "none",
+    },
+    formWrapper: {
+      padding: 20,
+    },
+    formRow: {
+      flexDirection: "column",
+    },
   },
 });

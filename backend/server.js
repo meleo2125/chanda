@@ -130,7 +130,23 @@ async function scoreResumeWithGemini(resumeData, jobRequirements) {
     5. Overall Profile Score (0-100):
     - Project relevance
     - Industry alignment
-    - Additional achievements
+    
+    6. Achievements Score (0-100):
+    - Evaluate relevance of achievements to the role
+    - Consider impact and scale of achievements
+    - Assess leadership qualities demonstrated
+    
+    7. Certificates Score (0-100):
+    - Score based on relevant technical/professional certifications
+    - Consider recency and level of certifications
+    - Value industry-recognized certifications higher
+    
+    8. Cultural Fit Score (0-100):
+    - Assess fit with company values based on resume
+    - Consider community involvement and soft skills
+    - Evaluate alignment with job requirements and company culture
+
+    Keep your analysis for each section brief and concise - maximum 2 sentences per section.
     
     Return only valid JSON in this format:
     {
@@ -139,15 +155,21 @@ async function scoreResumeWithGemini(resumeData, jobRequirements) {
             "experience_score": number (0-100),
             "education_score": number (0-100),
             "notice_period_score": number (0-100),
-            "overall_profile_score": number (0-100)
+            "overall_profile_score": number (0-100),
+            "achievements_score": number (0-100),
+            "certificates_score": number (0-100),
+            "cultural_fit_score": number (0-100)
         },
         "final_score": number (average of all scores),
         "detailed_reasoning": {
-            "skills_analysis": string,
-            "experience_analysis": string,
-            "education_analysis": string,
-            "notice_period_analysis": string,
-            "overall_analysis": string
+            "skills_analysis": string (brief),
+            "experience_analysis": string (brief),
+            "education_analysis": string (brief),
+            "notice_period_analysis": string (brief),
+            "overall_analysis": string (brief),
+            "achievements_analysis": string (brief),
+            "certificates_analysis": string (brief),
+            "cultural_fit_analysis": string (brief)
         }
     }
   `;
@@ -162,7 +184,82 @@ async function scoreResumeWithGemini(resumeData, jobRequirements) {
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
+
+    // Save the raw response for debugging
+    try {
+      // Create directory if it doesn't exist
+      if (!fs.existsSync("./backend/gemini_responses")) {
+        fs.mkdirSync("./backend/gemini_responses", { recursive: true });
+      }
+
+      // Save response with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      fs.writeFileSync(
+        `./backend/gemini_responses/response_${timestamp}.json`,
+        JSON.stringify(
+          {
+            prompt: prompt,
+            raw_response: response.data,
+            parsed_response: reply,
+          },
+          null,
+          2
+        )
+      );
+      console.log("Gemini response saved to file for debugging");
+    } catch (saveError) {
+      console.error("Error saving Gemini response to file:", saveError);
+    }
+
     const result = JSON.parse(reply);
+
+    // Ensure all required fields exist in the result
+    if (!result.breakdown) {
+      result.breakdown = {};
+    }
+
+    // Ensure all score fields exist
+    const requiredScoreFields = [
+      "skills_score",
+      "experience_score",
+      "education_score",
+      "notice_period_score",
+      "overall_profile_score",
+      "achievements_score",
+      "certificates_score",
+      "cultural_fit_score",
+    ];
+
+    requiredScoreFields.forEach((field) => {
+      if (result.breakdown[field] === undefined) {
+        result.breakdown[field] = 0;
+      }
+    });
+
+    // Ensure detailed reasoning exists
+    if (!result.detailed_reasoning) {
+      result.detailed_reasoning = {};
+    }
+
+    // Ensure all analysis fields exist
+    const requiredAnalysisFields = [
+      "skills_analysis",
+      "experience_analysis",
+      "education_analysis",
+      "notice_period_analysis",
+      "overall_analysis",
+      "achievements_analysis",
+      "certificates_analysis",
+      "cultural_fit_analysis",
+    ];
+
+    requiredAnalysisFields.forEach((field) => {
+      if (!result.detailed_reasoning[field]) {
+        result.detailed_reasoning[
+          field
+        ] = `No analysis available for ${field.replace("_analysis", "")}.`;
+      }
+    });
 
     // Ensure final score is average of all scores
     const scores = Object.values(result.breakdown);
@@ -350,6 +447,9 @@ const submissionSchema = new mongoose.Schema({
       education_score: Number,
       notice_period_score: Number,
       overall_profile_score: Number,
+      achievements_score: Number,
+      certificates_score: Number,
+      cultural_fit_score: Number,
     },
     final_score: Number,
     detailed_reasoning: {
@@ -358,6 +458,9 @@ const submissionSchema = new mongoose.Schema({
       education_analysis: String,
       notice_period_analysis: String,
       overall_analysis: String,
+      achievements_analysis: String,
+      certificates_analysis: String,
+      cultural_fit_analysis: String,
     },
   },
   submittedAt: {
@@ -1015,6 +1118,59 @@ app.post(
         aiEvaluation,
       });
 
+      // Ensure the new fields exist in aiEvaluation before saving
+      if (submission.aiEvaluation && submission.aiEvaluation.breakdown) {
+        // Set default values of 0 for any missing score fields
+        if (
+          submission.aiEvaluation.breakdown.achievements_score === undefined
+        ) {
+          submission.aiEvaluation.breakdown.achievements_score = 0;
+        }
+        if (
+          submission.aiEvaluation.breakdown.certificates_score === undefined
+        ) {
+          submission.aiEvaluation.breakdown.certificates_score = 0;
+        }
+        if (
+          submission.aiEvaluation.breakdown.cultural_fit_score === undefined
+        ) {
+          submission.aiEvaluation.breakdown.cultural_fit_score = 0;
+        }
+
+        // Set default values for missing reasoning fields
+        if (!submission.aiEvaluation.detailed_reasoning) {
+          submission.aiEvaluation.detailed_reasoning = {};
+        }
+
+        if (!submission.aiEvaluation.detailed_reasoning.achievements_analysis) {
+          submission.aiEvaluation.detailed_reasoning.achievements_analysis =
+            "No analysis available for achievements.";
+        }
+        if (!submission.aiEvaluation.detailed_reasoning.certificates_analysis) {
+          submission.aiEvaluation.detailed_reasoning.certificates_analysis =
+            "No analysis available for certificates.";
+        }
+        if (!submission.aiEvaluation.detailed_reasoning.cultural_fit_analysis) {
+          submission.aiEvaluation.detailed_reasoning.cultural_fit_analysis =
+            "No analysis available for cultural fit.";
+        }
+
+        // Recalculate final score with all parameters
+        const scores = [
+          submission.aiEvaluation.breakdown.skills_score || 0,
+          submission.aiEvaluation.breakdown.experience_score || 0,
+          submission.aiEvaluation.breakdown.education_score || 0,
+          submission.aiEvaluation.breakdown.notice_period_score || 0,
+          submission.aiEvaluation.breakdown.overall_profile_score || 0,
+          submission.aiEvaluation.breakdown.achievements_score || 0,
+          submission.aiEvaluation.breakdown.certificates_score || 0,
+          submission.aiEvaluation.breakdown.cultural_fit_score || 0,
+        ];
+        submission.aiEvaluation.final_score = Math.round(
+          scores.reduce((a, b) => a + b, 0) / scores.length
+        );
+      }
+
       const savedSubmission = await submission.save();
       console.log(`Form submission saved with ID: ${savedSubmission._id}`);
 
@@ -1097,6 +1253,27 @@ app.get("/api/submissions/:formId", auth, async (req, res) => {
               a.aiEvaluation?.breakdown?.overall_profile_score || 0;
             const scoreB =
               b.aiEvaluation?.breakdown?.overall_profile_score || 0;
+            return scoreB - scoreA;
+          });
+          break;
+        case "achievements_score":
+          submissions.sort((a, b) => {
+            const scoreA = a.aiEvaluation?.breakdown?.achievements_score || 0;
+            const scoreB = b.aiEvaluation?.breakdown?.achievements_score || 0;
+            return scoreB - scoreA;
+          });
+          break;
+        case "certificates_score":
+          submissions.sort((a, b) => {
+            const scoreA = a.aiEvaluation?.breakdown?.certificates_score || 0;
+            const scoreB = b.aiEvaluation?.breakdown?.certificates_score || 0;
+            return scoreB - scoreA;
+          });
+          break;
+        case "cultural_fit_score":
+          submissions.sort((a, b) => {
+            const scoreA = a.aiEvaluation?.breakdown?.cultural_fit_score || 0;
+            const scoreB = b.aiEvaluation?.breakdown?.cultural_fit_score || 0;
             return scoreB - scoreA;
           });
           break;
